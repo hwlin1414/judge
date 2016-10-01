@@ -1,0 +1,40 @@
+#include<stdio.h>
+#include<stdlib.h>
+#include<string.h>
+#include<sys/ptrace.h>
+#include<sys/wait.h>
+#include<errno.h>
+#include<signal.h>
+#include<unistd.h>
+#include<machine/reg.h>
+#define PROCESS_PATH "./test"
+
+int main(void){
+	int i, status, child, kill_ret;
+	struct reg regs;
+
+	child = fork();
+	if(child == 0){
+		ptrace(PT_TRACE_ME, 0, NULL, 0);
+		execl(PROCESS_PATH, PROCESS_PATH, NULL);
+		exit(0);
+	}else{
+		i = 0;
+		wait(&status);
+		while(1){
+			ptrace(PT_GETREGS, child, (caddr_t)&regs, 0);
+			if (regs.r_rax == 10)
+			{
+				fprintf(stderr, "Got it\n");
+				kill_ret = kill(child, SIGKILL);
+				if (kill_ret == -1)
+				{
+					fprintf(stderr, "Failed to kill ---> %s\n", strerror(errno));
+				}
+			}
+			//printf("%d time, system call %ld\n", i++, regs.r_rax);
+			ptrace(PT_SYSCALL, child, NULL, 0);
+		}
+	}
+	return 0;
+}
